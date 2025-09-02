@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Puntaje de Convivencia – Multi Cursos</title>
+  <style>
+    :root{
+      --bg:#0f172a; --panel:#0b1223; --line:#1f2937; --text:#e5e7eb;
+      --ok:#22c55e; --bad:#ef4444; --warn:#f59e0b; --link:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Noto Sans',sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(15,23,42,.9);border-bottom:1px solid var(--line);padding:12px 16px;z-index:5}
+    main{display:grid;grid-template-columns:280px 1fr;gap:12px;max-width:1280px;margin:0 auto;padding:16px}
+    @media (max-width:980px){ main{grid-template-columns:1fr} }
+    h1{margin:0;font-size:20px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .btn{border:0;border-radius:10px;padding:10px 12px;font-weight:600;cursor:pointer}
+    .ghost{background:#111827;color:var(--text);border:1px solid var(--line)}
+    .good{background:var(--ok);color:#05220f}
+    .bad{background:var(--bad);color:#2a0606}
+    .warn{background:var(--warn);color:#201400}
+    .link{background:var(--link);color:#062030}
+    input,textarea,select{background:#0a0f1f;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px 12px}
+    textarea{min-height:90px;width:100%;resize:vertical}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .col{display:grid;gap:10px}
+    .list{display:grid;gap:10px}
+    .student{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;background:#0a0f1f;border:1px solid var(--line);border-radius:12px;padding:10px}
+    .name{font-weight:600}
+    .points{display:inline-flex;gap:8px;align-items:center}
+    .points .v{min-width:40px;text-align:center;font-variant-numeric:tabular-nums;font-weight:800}
+    .muted{color:#94a3b8}
+    .pill{border-radius:999px;padding:2px 8px;background:#0a0f1f;border:1px solid var(--line);font-size:12px;color:#cbd5e1}
+    .courseItem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;background:#0a0f1f;cursor:pointer}
+    .courseItem.active{outline:2px solid var(--link)}
+    .grow{flex:1}
+    a{color:var(--link)}
+    .sr{position:absolute;left:-9999px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row" style="justify-content:space-between">
+      <h1>📀 Puntaje de Convivencia — Multi Cursos</h1>
+      <div class="row">
+        <button class="btn ghost" id="btnSaveAll">💾 Guardar todo</button>
+        <button class="btn warn" id="btnResetCurrent">Reiniciar curso activo</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Sidebar cursos -->
+    <aside class="panel col">
+      <div class="row" style="justify-content:space-between">
+        <strong>Cursos</strong>
+        <span class="pill" id="coursesCount">0</span>
+      </div>
+      <div class="col">
+        <label>Nombre nuevo curso
+          <input id="newCourseName" placeholder="2°A 2025" />
+        </label>
+        <label>Puntos base
+          <input id="newCourseBase" type="number" value="3" min="0" step="1" />
+        </label>
+        <button class="btn link" id="btnAddCourse">➕ Crear curso</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line)">
+      <div id="coursesList" class="col"></div>
+      <div class="muted" style="font-size:12px">Puedes crear/eliminar cursos y cambiar entre ellos con un clic.</div>
+    </aside>
+
+    <!-- Panel principal -->
+    <section class="panel col">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="row">
+          <strong id="activeTitle">Curso: —</strong>
+          <span class="pill" id="activeBase">Base: 3</span>
+          <span class="pill" id="activeCount">0 estudiantes</span>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="btnExportCSV">Exportar CSV</button>
+          <label class="btn ghost" for="importCsv">Importar CSV</label>
+          <input id="importCsv" class="sr" type="file" accept=".csv" />
+        </div>
+      </div>
+
+      <div class="col" style="margin-top:10px">
+        <div class="row" style="align-items:flex-end;justify-content:space-between">
+          <label class="grow">Agregar estudiantes (un nombre por línea)
+            <textarea id="namesBox" placeholder="Apellido, Nombre&#10;Soto, Valentina&#10;González, Diego"></textarea>
+          </label>
+          <div class="col" style="width:220px">
+            <label>Puntos base del curso
+              <input id="baseBox" type="number" value="3" min="0" step="1" />
+            </label>
+            <button class="btn good" id="btnApplyList">➕ Cargar/Actualizar lista</button>
+          </div>
+        </div>
+
+        <div id="studentsList" class="list"></div>
+        <div class="muted" style="font-size:12px;text-align:center">Tip: selecciona una tarjeta y usa <kbd>+</kbd> o <kbd>-</kbd> para sumar/restar.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const uid = () => Math.random().toString(36).slice(2,9);
+    const idFrom = n => n.trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+
+    // ===== Modelo =====
+    let store = { courses: [], activeId: null };
+    const STORAGE_KEY = 'convivencia:v3';
+
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
+    function load(){ try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw) store = JSON.parse(raw);}catch{} }
+
+    function addCourse(name, base=3){
+      const c = { id: uid(), name, base: Number(base)||0, students: [] };
+      store.courses.push(c);
+      store.activeId = c.id;
+      render();
+    }
+    function removeCourse(id){
+      const idx = store.courses.findIndex(c=>c.id===id); if(idx<0) return;
+      if(!confirm('¿Eliminar este curso? Esta acción no se puede deshacer.')) return;
+      store.courses.splice(idx,1);
+      if(store.activeId===id) store.activeId = store.courses[0]?.id || null;
+      render();
+    }
+    function setActive(id){ store.activeId = id; render(); }
+    function active(){ return store.courses.find(c=>c.id===store.activeId) || null; }
+
+    function parseNames(text){
+      return text.split(/\\n+/).map(s=>s.trim()).filter(Boolean).map(n=>{
+        if(n.includes(',')){ const [ap, no] = n.split(',').map(s=>s.trim()); return `${no} ${ap}`; }
+        return n.replace(/\\s+/g,' ');
+      });
+    }
+
+    function ensureStudents(course, names){
+      const ids = new Set(course.students.map(s=>s.id));
+      for(const nm of names){
+        const id = idFrom(nm);
+        if(!ids.has(id)) course.students.push({ id, name:nm, points: course.base });
+      }
+    }
+
+    function changePoints(courseId, studentId, delta){
+      const c = store.courses.find(x=>x.id===courseId); if(!c) return;
+      const s = c.students.find(x=>x.id===studentId); if(!s) return;
+      s.points += delta; render();
+    }
+
+    function resetCourseToBase(courseId){
+      const c = store.courses.find(x=>x.id===courseId); if(!c) return;
+      for(const s of c.students){ s.points = c.base; }
+      render();
+    }
+
+    function toCSV(course){
+      const header = ['Curso','Nombre','Puntos'];
+      const rows = course.students.map(s => [course.name, `"${s.name.replaceAll('"','""')}"`, s.points].join(','));
+      return header.join(',') + "\\n" + rows.join("\\n");
+    }
+
+    function importCSV(course, text){
+      const lines = text.split(/\\n+/).filter(Boolean);
+      for(let i=1;i<lines.length;i++){
+        const cols = lines[i].match(/\\"([^\\"]*)\\"|([^,]+)/g) || [];
+        const name = (cols[1]||'').replaceAll('\"','').trim();
+        const pts = parseInt((cols[2]||'').trim()||course.base,10);
+        if(name){
+          const id = idFrom(name);
+          const found = course.students.find(s=>s.id===id);
+          if(found){ found.points = pts; found.name = name; } else { course.students.push({ id, name, points: pts }); }
+        }
+      }
+      render();
+    }
+
+    // ===== Render =====
+    function renderSidebar(){
+      $('#coursesCount').textContent = String(store.courses.length);
+      const wrap = $('#coursesList'); wrap.innerHTML='';
+      for(const c of store.courses){
+        const item = document.createElement('div');
+        item.className = 'courseItem' + (c.id===store.activeId ? ' active' : '');
+        const title = document.createElement('div'); title.textContent = c.name; title.className='grow';
+        const base = document.createElement('span'); base.className='pill'; base.textContent = `Base ${c.base}`;
+        const del = document.createElement('button'); del.className='btn bad'; del.textContent='🗑';
+        del.addEventListener('click', (e)=>{ e.stopPropagation(); removeCourse(c.id); });
+        item.addEventListener('click', ()=>setActive(c.id));
+        item.appendChild(title); item.appendChild(base); item.appendChild(del);
+        wrap.appendChild(item);
+      }
+    }
+
+    function renderMain(){
+      const c = active();
+      $('#activeTitle').textContent = 'Curso: ' + (c? c.name : '—');
+      $('#activeBase').textContent = 'Base: ' + (c? c.base : 0);
+      $('#activeCount').textContent = (c? c.students.length : 0) + ' estudiantes';
+      $('#baseBox').value = c? c.base : 3;
+
+      const list = $('#studentsList'); list.innerHTML='';
+      if(!c) return;
+      for(const s of c.students){
+        const item = document.createElement('div');
+        item.className='student'; item.tabIndex=0;
+        const nm = document.createElement('div'); nm.className='name'; nm.textContent = s.name;
+        const pts = document.createElement('div'); pts.className='points';
+        const v = document.createElement('span'); v.className='v'; v.textContent = s.points;
+        const plus = document.createElement('button'); plus.className='btn good'; plus.textContent='+1';
+        const minus = document.createElement('button'); minus.className='btn bad'; minus.textContent='−1';
+        plus.addEventListener('click', ()=>changePoints(c.id, s.id, +1));
+        minus.addEventListener('click', ()=>changePoints(c.id, s.id, -1));
+        pts.appendChild(v); pts.appendChild(plus); pts.appendChild(minus);
+        item.appendChild(nm); item.appendChild(pts);
+        item.addEventListener('keydown', e=>{ if(e.key==='+') changePoints(c.id, s.id, +1); if(e.key==='-') changePoints(c.id, s.id, -1); });
+        list.appendChild(item);
+      }
+    }
+
+    function render(){ renderSidebar(); renderMain(); save(); }
+
+    // ===== Eventos =====
+    $('#btnAddCourse').addEventListener('click', ()=>{
+      const name = ($('#newCourseName').value||'').trim(); if(!name) return alert('Escribe un nombre de curso');
+      const base = parseInt($('#newCourseBase').value||'3',10);
+      addCourse(name, base);
+      $('#newCourseName').value='';
+    });
+
+    $('#btnApplyList').addEventListener('click', ()=>{
+      const c = active(); if(!c) return alert('Primero crea o selecciona un curso');
+      c.base = parseInt($('#baseBox').value||'3',10);
+      const names = parseNames($('#namesBox').value);
+      ensureStudents(c, names);
+      render();
+    });
+
+    $('#btnExportCSV').addEventListener('click', ()=>{
+      const c = active(); if(!c) return;
+      const file = `puntaje_${c.name.replace(/\\s+/g,'_')}.csv`;
+      const blob = new Blob([toCSV(c)], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=file; a.click(); URL.revokeObjectURL(url);
+    });
+
+    $('#importCsv').addEventListener('change', e=>{
+      const c = active(); if(!c) return;
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => { importCSV(c, ev.target.result); };
+      reader.readAsText(file);
+      e.target.value='';
+    });
+
+    $('#btnResetCurrent').addEventListener('click', ()=>{
+      const c = active(); if(!c) return;
+      if(confirm('Esto pondrá a todos con los puntos base del curso. ¿Continuar?')) resetCourseToBase(c.id);
+    });
+
+    $('#btnSaveAll').addEventListener('click', ()=>{ save(); alert('Guardado ✔'); });
+
+    // ===== Init =====
+    (function init(){
+      load();
+      render();
+    })();
+  </script>
+</body>
+</html>
